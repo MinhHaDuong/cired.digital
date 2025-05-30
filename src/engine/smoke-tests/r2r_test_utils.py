@@ -24,6 +24,8 @@ TEST_CONTENT = config.get("TEST_CONTENT", "QuetzalX is a person that works at CI
 QUERY = config.get("TEST_QUERY", "Who is QuetzalX?")
 MODEL = "openai/gpt-4o-mini"
 TEMPERATURE = 0.0
+DOCUMENT_POLLING_TIMEOUT = 30  # seconds
+DOCUMENT_POLLING_INTERVAL = 2  # seconds
 
 client = R2RClient(SERVER_URL)
 
@@ -88,9 +90,31 @@ def create_or_get_document() -> str | None:
     """
     try:
         response = client.documents.create(file_path=TEST_FILE)
+        document_id = response.results.document_id
         print("Document created.")
-        time.sleep(4)  # Allow time for ingestion
-        return response.results.document_id
+
+        start_time = time.time()
+        while time.time() - start_time < DOCUMENT_POLLING_TIMEOUT:
+            try:
+                doc_info = client.documents.retrieve(document_id)
+                ingestion_status = getattr(doc_info.results, 'ingestion_status', 'unknown')
+
+                print(f"Document status: ingestion={ingestion_status}")
+
+                if ingestion_status == "success":
+                    print("Document is ready.")
+                    return document_id
+                elif ingestion_status == "failed":
+                    print(f"Document processing failed: ingestion={ingestion_status}")
+                    return None
+
+                time.sleep(DOCUMENT_POLLING_INTERVAL)
+            except Exception as poll_error:
+                print(f"Error checking document status: {poll_error}")
+                time.sleep(DOCUMENT_POLLING_INTERVAL)
+
+        print(f"Timeout waiting for document to be ready after {DOCUMENT_POLLING_TIMEOUT} seconds")
+        return document_id
     except Exception as e:
         error_msg = str(e)
         if "already exists" in error_msg:
