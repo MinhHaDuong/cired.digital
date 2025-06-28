@@ -311,6 +311,28 @@ img {
   to { transform: rotate(360deg); }
 }
 
+.streaming-events {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.8rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.streaming-title {
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  color: #3b82f6;
+}
+
+.streaming-event {
+  margin: 0.2rem 0;
+  color: #666;
+}
+
 /* ==========================================
    TABLE STYLES
    ========================================== */

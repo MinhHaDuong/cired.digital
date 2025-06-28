@@ -61,8 +61,64 @@ async function executeQuery(context) {
 }
 
 async function renderResponse(responseData, context) {
-    const data = await responseData.response.json();
-    debugLog('Raw server response', data);
+    const reader = responseData.response.body.getReader();
+    const decoder = new TextDecoder();
+    const startTime = Date.now();
+    
+    let finalAnswer = '';
+    let citations = [];
+    let searchResults = [];
+    
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+                if (line.trim() === '' || !line.startsWith('data: ')) continue;
+                
+                try {
+                    const eventData = JSON.parse(line.slice(6));
+                    const timestamp = (Date.now() - startTime) / 1000;
+                    
+                    debugLog('Streaming event received', { type: eventData.type, timestamp });
+                    addStreamingEvent(eventData.type, timestamp, eventData.data);
+                    
+                    switch (eventData.type) {
+                        case 'search_results':
+                            searchResults = eventData.data || [];
+                            break;
+                        case 'message':
+                            finalAnswer += eventData.data || '';
+                            break;
+                        case 'citation':
+                            if (eventData.data) citations.push(eventData.data);
+                            break;
+                        case 'final_answer':
+                            finalAnswer = eventData.data || finalAnswer;
+                            break;
+                    }
+                } catch (parseError) {
+                    debugLog('Failed to parse streaming event', { line, error: parseError.message });
+                }
+            }
+        }
+    } finally {
+        reader.releaseLock();
+    }
+    
+    const data = {
+        results: {
+            generated_answer: finalAnswer,
+            citations: citations,
+            search_results: searchResults
+        }
+    };
+    
+    debugLog('Streaming completed, processing final response', data);
     
     monitor(MonitorEventType.RESPONSE, {
         queryId: context.queryId,
@@ -76,6 +132,7 @@ async function renderResponse(responseData, context) {
 
 function finalizeUI() {
     animateWaitEnd();
+    hideStreamingEvents();
     debugLog('Message processing completed');
 }
 
@@ -111,7 +168,7 @@ function buildRequestBody(query, config) {
             model: config.model,
             temperature: config.temperature,
             max_tokens: config.maxTokens,
-            stream: false
+            stream: true
         },
         include_title_if_available: true,
         include_web_search: config.includeWebSearch,

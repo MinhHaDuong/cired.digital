@@ -36,6 +36,46 @@ function hideTyping() {
     document.getElementById('typing-indicator')?.remove();
 }
 
+function showStreamingEvents() {
+    debugLog('Showing streaming events container');
+    const existingContainer = document.getElementById('streaming-events');
+    if (existingContainer) return existingContainer;
+    
+    const eventsContainer = document.createElement('div');
+    eventsContainer.id = 'streaming-events';
+    eventsContainer.className = 'streaming-events';
+    eventsContainer.innerHTML = '<div class="streaming-title">Server Events:</div>';
+    
+    const typingIndicator = document.getElementById('typing-indicator');
+    if (typingIndicator) {
+        typingIndicator.appendChild(eventsContainer);
+    }
+    
+    return eventsContainer;
+}
+
+function addStreamingEvent(eventType, timestamp, data = null) {
+    debugLog('Adding streaming event', { eventType, timestamp, data });
+    const container = showStreamingEvents();
+    const eventDiv = document.createElement('div');
+    eventDiv.className = 'streaming-event';
+    
+    let eventText = `[${timestamp.toFixed(1)}s] ${eventType}`;
+    if (data && eventType === 'message') {
+        eventText += `: ${data.slice(0, 50)}${data.length > 50 ? '...' : ''}`;
+    }
+    
+    eventDiv.textContent = eventText;
+    container.appendChild(eventDiv);
+    
+    eventDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function hideStreamingEvents() {
+    debugLog('Hiding streaming events');
+    document.getElementById('streaming-events')?.remove();
+}
+
 // ==========================================
 // ==========================================
 
